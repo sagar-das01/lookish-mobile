@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+      - name: Update version in pubspec.yaml
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          echo "VERSION=$(node -p -e "require('./package.json').version")" >> $GITHUB_ENV
+          dart update_version.dart
+
+      - name: Commit version update
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pubspec.yaml
+          git commit -m "chore(release): update version to ${{ steps.release.outputs.new_release_version }}"
+          git push origin main
